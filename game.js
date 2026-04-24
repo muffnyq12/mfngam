@@ -1280,12 +1280,9 @@ window.startGame = function () {
     gameStarted = true;
     restartGame();
 
-    // Show Mobile Controls if touch device or small screen
-    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.matchMedia("(pointer: coarse)").matches;
-    if (isTouch || window.innerWidth < 1100) {
-        const mc = document.getElementById("mobile-controls");
-        if (mc) mc.style.display = "block";
-    }
+    // FORCE SHOW Mobile Controls for all devices during gameplay
+    const mc = document.getElementById("mobile-controls");
+    if (mc) mc.style.setProperty("display", "block", "important");
 };
 
 function togglePause() {
@@ -1356,14 +1353,10 @@ function adminPrepareGame() {
     cam.y = ship.y - window.innerHeight / 2;
 
     if (window.closeModal) closeModal('mode');
-    if (window.closeModal) closeModal('mode');
     
-    // Show Mobile Controls if touch device or small screen
-    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.matchMedia("(pointer: coarse)").matches;
-    if (isTouch || window.innerWidth < 1100) {
-        const mc = document.getElementById("mobile-controls");
-        if (mc) mc.style.display = "block";
-    }
+    // FORCE SHOW Mobile Controls for all devices during gameplay
+    const mc = document.getElementById("mobile-controls");
+    if (mc) mc.style.setProperty("display", "block", "important");
 
     if (document.getElementById("entry-screen")) document.getElementById("entry-screen").style.display = "none";
     if (document.getElementById("menu-bg")) document.getElementById("menu-bg").style.display = "none";
