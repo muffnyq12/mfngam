@@ -442,7 +442,6 @@ canvas.addEventListener("touchstart", e => {
     touch.active = true;
     touch.x = t.clientX;
     touch.y = t.clientY;
-    shoot();
 }, { passive: false });
 canvas.addEventListener("touchmove", e => { e.preventDefault(); const t = e.touches[0]; touch.x = t.clientX; touch.y = t.clientY; }, { passive: false });
 canvas.addEventListener("touchend", e => { e.preventDefault(); touch.active = false; }, { passive: false });
@@ -455,7 +454,6 @@ canvas.addEventListener("mousedown", e => {
     mouse.active = true;
     mouse.x = e.clientX;
     mouse.y = e.clientY;
-    shoot();
 });
 canvas.addEventListener("mousemove", e => { if (!mouse.active) return; mouse.x = e.clientX; mouse.y = e.clientY; });
 window.addEventListener("mouseup", () => { mouse.active = false; });
@@ -606,7 +604,7 @@ function update() {
         // Firing Logic
         if (keys[" "] || isMobileFiring) {
             if (Date.now() - ship.lastFire > ship.fireDelay) {
-                fireBullet();
+                shoot();
                 ship.lastFire = Date.now();
             }
         }
@@ -1467,10 +1465,47 @@ function initMobileInputs() {
         if (joyKnob) joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
     }
 
-    fireBtn.addEventListener("pointerdown", (e) => {
+    const startFire = (e) => {
         e.preventDefault();
-        firePointerId = e.pointerId;
+        firePointerId = e.pointerId || 999;
         isMobileFiring = true;
+        fireBtn.classList.add("active");
+    };
+
+    fireBtn.addEventListener("pointerdown", startFire);
+    fireBtn.addEventListener("touchstart", (e) => {
+        if (!isMobileFiring) startFire(e);
+    });
+    fireBtn.addEventListener("touchend", (e) => {
+        isMobileFiring = false;
+        fireBtn.classList.remove("active");
+    });
+
+    const stopFire = (e) => {
+        if (e.pointerId === firePointerId) {
+            isMobileFiring = false;
+            firePointerId = null;
+            fireBtn.classList.remove("active");
+        }
+    };
+
+    window.addEventListener("pointerup", (e) => {
+        if (e.pointerId === joystickPointerId) {
+            joystick.active = false;
+            joystickPointerId = null;
+            joystick.dist = 0;
+            if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
+        }
+        stopFire(e);
+    });
+
+    window.addEventListener("pointercancel", (e) => {
+        if (e.pointerId === joystickPointerId) {
+            joystick.active = false;
+            joystickPointerId = null;
+            if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
+        }
+        stopFire(e);
     });
 }
 

@@ -343,9 +343,11 @@
             touch-action: none;
             transition: transform 0.1s, background 0.1s;
         }
-        #fire-btn:active {
+        #fire-btn:active, #fire-btn.active {
             transform: scale(0.9);
             background: rgba(255, 0, 119, 0.6);
+            box-shadow: 0 0 30px var(--neon-pink);
+            border-color: #fff;
         }
 
         #start-btn {
