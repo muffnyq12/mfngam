@@ -1396,7 +1396,7 @@ window.adminSpawnBoss = function (type) {
     console.log("Admin: Spawned Boss", type);
 };
 
-// MOBILE INPUT LISTENERS
+// MOBILE INPUT LISTENERS (Multitouch Fixed)
 function initMobileInputs() {
     const joyArea = document.getElementById("joystick-area");
     const joyKnob = document.getElementById("joystick-knob");
@@ -1404,19 +1404,45 @@ function initMobileInputs() {
 
     if (!joyArea || !fireBtn) return;
 
+    let joystickPointerId = null;
+    let firePointerId = null;
+
     joyArea.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        joystickPointerId = e.pointerId;
         joystick.active = true;
         updateJoystick(e);
     });
 
     window.addEventListener("pointermove", (e) => {
-        if (joystick.active) updateJoystick(e);
+        if (joystick.active && e.pointerId === joystickPointerId) {
+            updateJoystick(e);
+        }
     });
 
-    window.addEventListener("pointerup", () => {
-        joystick.active = false;
-        joystick.dist = 0;
-        if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
+    window.addEventListener("pointerup", (e) => {
+        if (e.pointerId === joystickPointerId) {
+            joystick.active = false;
+            joystickPointerId = null;
+            joystick.dist = 0;
+            if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
+        }
+        if (e.pointerId === firePointerId) {
+            isMobileFiring = false;
+            firePointerId = null;
+        }
+    });
+
+    window.addEventListener("pointercancel", (e) => {
+        if (e.pointerId === joystickPointerId) {
+            joystick.active = false;
+            joystickPointerId = null;
+            if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
+        }
+        if (e.pointerId === firePointerId) {
+            isMobileFiring = false;
+            firePointerId = null;
+        }
     });
 
     function updateJoystick(e) {
@@ -1443,11 +1469,8 @@ function initMobileInputs() {
 
     fireBtn.addEventListener("pointerdown", (e) => {
         e.preventDefault();
+        firePointerId = e.pointerId;
         isMobileFiring = true;
-    });
-
-    window.addEventListener("pointerup", (e) => {
-        isMobileFiring = false;
     });
 }
 
