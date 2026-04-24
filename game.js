@@ -131,7 +131,11 @@ let world = { width: 2000, height: 1400 };
 let ship = { x: 1000, y: 700, a: 0, r: 25, lastFire: 0, invulnerable: 0, isFiring: false };
 let bullets = [];
 let asteroids = [];
-let particles = [];
+const MAX_PARTICLES = 400;
+let particles = Array.from({ length: MAX_PARTICLES }, () => ({
+    x: 0, y: 0, vx: 0, vy: 0, life: 0, color: '#fff', size: 2, type: 'plasma', active: false
+}));
+
 let coins = [];
 let hazards = [];
 let floatingTexts = [];
@@ -407,19 +411,28 @@ function initAsteroids() {
 initAsteroids();
 
 // PARTICLE SYSTEM
-function createExplosion(x, y, color, count = 15) {
-    for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 6 + 2;
-        particles.push({
-            x, y,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 1.0,
-            color: color,
-            size: Math.random() * 3 + 2
-        });
+function createExplosion(x, y, color, count = 15, type = "plasma") {
+    let spawned = 0;
+    for (let i = 0; i < MAX_PARTICLES && spawned < count; i++) {
+        if (!particles[i].active) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 2;
+            particles[i].x = x;
+            particles[i].y = y;
+            particles[i].vx = Math.cos(angle) * speed;
+            particles[i].vy = Math.sin(angle) * speed;
+            particles[i].life = 1.0;
+            particles[i].color = color;
+            particles[i].size = Math.random() * 3 + 2;
+            particles[i].type = type;
+            particles[i].active = true;
+            spawned++;
+        }
     }
+}
+
+function clearParticles() {
+    for (let i = 0; i < MAX_PARTICLES; i++) particles[i].active = false;
 }
 
 function createFloatingText(x, y, text) {
@@ -621,21 +634,24 @@ function update() {
             ship.a += da * 0.2;
         }
         if (touch.active || mouse.active || keys["ArrowUp"] || keys["w"] || keys["ArrowDown"] || keys["s"] || keys["ArrowLeft"] || keys["a"] || keys["ArrowRight"] || keys["d"]) {
-            // ENGINE PARTICLES
-            const pCount = (base.trail === 'fire') ? 3 : 1;
-            for (let i = 0; i < pCount; i++) {
-                const pAngle = ship.a + Math.PI + (Math.random() - 0.5) * 0.5;
-                const pSpeed = Math.random() * 3 + 2;
-                particles.push({
-                    x: ship.x - Math.cos(ship.a) * 20,
-                    y: ship.y - Math.sin(ship.a) * 20,
-                    vx: Math.cos(pAngle) * pSpeed,
-                    vy: Math.sin(pAngle) * pSpeed,
-                    life: 0.5 + Math.random() * 0.5,
-                    color: base.color,
-                    size: (base.trail === 'fire') ? Math.random() * 6 + 2 : Math.random() * 3 + 1,
-                    type: base.trail
-                });
+            // ENGINE PARTICLES (Using Pool)
+            let spawned = 0;
+            const pCount = (base.trail === 'fire') ? 2 : 1;
+            for (let i = 0; i < MAX_PARTICLES && spawned < pCount; i++) {
+                if (!particles[i].active) {
+                    const pAngle = ship.a + Math.PI + (Math.random() - 0.5) * 0.5;
+                    const pSpeed = Math.random() * 3 + 2;
+                    particles[i].x = ship.x - Math.cos(ship.a) * 20;
+                    particles[i].y = ship.y - Math.sin(ship.a) * 20;
+                    particles[i].vx = Math.cos(pAngle) * pSpeed;
+                    particles[i].vy = Math.sin(pAngle) * pSpeed;
+                    particles[i].life = 0.5 + Math.random() * 0.5;
+                    particles[i].color = base.color;
+                    particles[i].size = (base.trail === 'fire') ? Math.random() * 6 + 2 : Math.random() * 3 + 1;
+                    particles[i].type = base.trail;
+                    particles[i].active = true;
+                    spawned++;
+                }
             }
         }
 
@@ -702,9 +718,13 @@ function update() {
         }
 
         // No need for regular spawning here if we move it to Logic Updates
-        for (let i = particles.length - 1; i >= 0; i--) {
-            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.02;
-            if (p.life <= 0) particles.splice(i, 1);
+        // Particles (Optimized)
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            let p = particles[i];
+            if (p.active) {
+                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                if (p.life <= 0) p.active = false;
+            }
         }
         for (let i = floatingTexts.length - 1; i >= 0; i--) {
             let ft = floatingTexts[i]; ft.y += ft.vy; ft.life -= 0.02;
@@ -825,21 +845,24 @@ function update() {
         }
         ctx.restore();
     });
-    particles.forEach(p => {
-        ctx.save(); ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
-        if (p.type === 'fire') {
-            ctx.shadowBlur = 15; ctx.shadowColor = p.color;
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
-        } else if (p.type === 'mech') {
-            ctx.fillRect(p.x, p.y, p.size, p.size);
-            if (Math.random() > 0.8) { // Occasional spark
-                ctx.fillStyle = "#fff"; ctx.fillRect(p.x, p.y, 2, 2);
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+        let p = particles[i];
+        if (p.active) {
+            ctx.save(); ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+            if (p.type === 'fire') {
+                ctx.shadowBlur = 15; ctx.shadowColor = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
+            } else if (p.type === 'mech') {
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                if (Math.random() > 0.8) { // Occasional spark
+                    ctx.fillStyle = "#fff"; ctx.fillRect(p.x, p.y, 2, 2);
+                }
+            } else {
+                ctx.fillRect(p.x, p.y, p.size, p.size);
             }
-        } else {
-            ctx.fillRect(p.x, p.y, p.size, p.size);
+            ctx.restore();
         }
-        ctx.restore();
-    });
+    }
 
     // --- DRAW COINS ---
     coins.forEach(c => {
@@ -1031,7 +1054,7 @@ function update() {
 }
 
 function restartGame() {
-    score = 0; displayScore = 0; asteroids = []; bullets = []; particles = []; floatingTexts = [];
+    score = 0; displayScore = 0; asteroids = []; bullets = []; clearParticles(); floatingTexts = [];
     coins = []; // Clear leftover coins on death
     hazards = []; // Clear Stage 2 hazards
     boss = null; // Clear boss on death
@@ -1265,12 +1288,10 @@ window.startGame = function () {
     // Close the mode modal explicitly
     if (window.closeModal) closeModal('mode');
 
-    // Hide ALL menu layers
+    // Hide main menu UI but KEEP grid for atmosphere
     document.getElementById("entry-screen").style.display = "none";
     if (document.getElementById("menu-bg")) document.getElementById("menu-bg").style.display = "none";
-    if (document.querySelector(".grid-layer")) document.querySelector(".grid-layer").style.display = "none";
-    if (document.querySelector(".overlay-effects")) document.querySelector(".overlay-effects").style.display = "none";
-
+    
     // Show pause button
     const pauseBtn = document.getElementById("ingame-pause-btn");
     if (pauseBtn) pauseBtn.style.display = "flex";
@@ -1278,7 +1299,12 @@ window.startGame = function () {
     gameStarted = true;
     restartGame();
 
-    // FORCE SHOW Mobile Controls for all devices during gameplay
+    // Orientation Lock for Mobile
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(e => console.log("Orientation lock denied"));
+    }
+
+    // FORCE SHOW Mobile Controls
     const mc = document.getElementById("mobile-controls");
     if (mc) mc.style.setProperty("display", "block", "important");
 };
@@ -1334,7 +1360,7 @@ function adminPrepareGame() {
     
     // Clear entities
     bullets = [];
-    particles = [];
+    clearParticles();
     hazards = [];
     floatingTexts = [];
     asteroids = [];
