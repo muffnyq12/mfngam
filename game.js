@@ -1279,6 +1279,13 @@ window.startGame = function () {
 
     gameStarted = true;
     restartGame();
+
+    // Show Mobile Controls if touch device or small screen
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.matchMedia("(pointer: coarse)").matches;
+    if (isTouch || window.innerWidth < 1100) {
+        const mc = document.getElementById("mobile-controls");
+        if (mc) mc.style.display = "block";
+    }
 };
 
 function togglePause() {
