@@ -1394,7 +1394,7 @@ window.adminSpawnBoss = function (type) {
     console.log("Admin: Spawned Boss", type);
 };
 
-// MOBILE INPUT LISTENERS (Multitouch Fixed)
+// MOBILE INPUT LISTENERS (Final Reliable Version)
 function initMobileInputs() {
     const joyArea = document.getElementById("joystick-area");
     const joyKnob = document.getElementById("joystick-knob");
@@ -1403,8 +1403,8 @@ function initMobileInputs() {
     if (!joyArea || !fireBtn) return;
 
     let joystickPointerId = null;
-    let firePointerId = null;
 
+    // JOYSTICK LOGIC
     joyArea.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         joystickPointerId = e.pointerId;
@@ -1415,23 +1415,6 @@ function initMobileInputs() {
     window.addEventListener("pointermove", (e) => {
         if (joystick.active && e.pointerId === joystickPointerId) {
             updateJoystick(e);
-        }
-    });
-
-    window.addEventListener("pointerup", (e) => {
-        if (e.pointerId === joystickPointerId) {
-            joystick.active = false;
-            joystickPointerId = null;
-            joystick.dist = 0;
-            if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
-        }
-    });
-
-    window.addEventListener("pointercancel", (e) => {
-        if (e.pointerId === joystickPointerId) {
-            joystick.active = false;
-            joystickPointerId = null;
-            if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
         }
     });
 
@@ -1449,29 +1432,23 @@ function initMobileInputs() {
             dist = joystick.maxDist;
         }
 
-        joystick.dx = dx;
-        joystick.dy = dy;
-        joystick.dist = dist;
-        joystick.angle = Math.atan2(dy, dx);
-
-        if (joyKnob) {
-            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-        }
+        joystick.dx = dx; joystick.dy = dy;
+        joystick.dist = dist; joystick.angle = Math.atan2(dy, dx);
+        if (joyKnob) joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
     }
 
+    // FIRE BUTTON LOGIC (Simplified & Atomic)
     const startFire = (e) => {
         if (e) e.preventDefault();
         ship.isFiring = true;
         fireBtn.classList.add("active");
-        shoot(); // Force first shot instantly
+        shoot(); // First shot instant
     };
 
     const stopFire = (e) => {
-        if (e && (e.pointerId === firePointerId || e.type === "touchend")) {
-            ship.isFiring = false;
-            firePointerId = null;
-            fireBtn.classList.remove("active");
-        }
+        if (e) e.preventDefault();
+        ship.isFiring = false;
+        fireBtn.classList.remove("active");
     };
 
     fireBtn.addEventListener("pointerdown", startFire);
@@ -1479,7 +1456,9 @@ function initMobileInputs() {
     fireBtn.addEventListener("pointerup", stopFire);
     fireBtn.addEventListener("touchend", stopFire);
     fireBtn.addEventListener("pointercancel", stopFire);
+    fireBtn.addEventListener("mouseleave", stopFire);
 
+    // GLOBAL RELEASE SAFETY
     window.addEventListener("pointerup", (e) => {
         if (e.pointerId === joystickPointerId) {
             joystick.active = false;
@@ -1487,7 +1466,6 @@ function initMobileInputs() {
             joystick.dist = 0;
             if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
         }
-        stopFire(e);
     });
 
     window.addEventListener("pointercancel", (e) => {
@@ -1496,18 +1474,18 @@ function initMobileInputs() {
             joystickPointerId = null;
             if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
         }
-        stopFire(e);
     });
 }
 
-// Ensure mobile controls are hidden on return to menu
+// Ensure mobile controls are correctly reset
 const originalReturnToMenu = window.returnToMenu;
 window.returnToMenu = function() {
     if (originalReturnToMenu) originalReturnToMenu();
     const mc = document.getElementById("mobile-controls");
     if (mc) mc.style.display = "none";
     joystick.active = false;
-    isMobileFiring = false;
+    ship.isFiring = false;
+    if (document.getElementById("fire-btn")) document.getElementById("fire-btn").classList.remove("active");
 };
 
 document.addEventListener("DOMContentLoaded", initMobileInputs);
@@ -1515,12 +1493,7 @@ document.addEventListener("DOMContentLoaded", initMobileInputs);
 // Check for Admin Query (Wait for DOM)
 document.addEventListener("DOMContentLoaded", () => {
     if (window.location.search.includes("admin=true")) {
-        console.log("Admin Mode: Active");
         const panel = document.getElementById("admin-panel");
-        if (panel) {
-            panel.style.display = "block";
-        } else {
-            console.error("Admin Mode Error: 'admin-panel' element not found in DOM");
-        }
+        if (panel) panel.style.display = "block";
     }
 });
