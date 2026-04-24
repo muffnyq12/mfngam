@@ -45,17 +45,20 @@ function removeBackground(img, tint) {
             r = data.data[i]; g = data.data[i + 1]; b = data.data[i + 2];
         }
 
-        const isGray = Math.abs(r - g) < 8 && Math.abs(g - b) < 8;
-        const isGrid = isGray && r > 100 && r < 210; // Checkered grays
-        const isBackground = (r < 75 && g < 75 && b < 75) || isGrid;
+        const isGray = Math.abs(r - g) < 15 && Math.abs(g - b) < 15;
+        const isGrid = isGray && r > 100 && r < 230; // Checkered grays
+        const isWhite = r > 220 && g > 220 && b > 220; // Pure whites
+        const isBlack = r < 40 && g < 40 && b < 40; // Deep blacks
+        
+        const isBackground = isBlack || isGrid || isWhite;
 
-        // Tightened radius to clip the grid
-        const tightRadius = radius * 0.92;
+        // Tightened radius to clip the grid, but more generous for bosses
+        const tightRadius = radius * 0.96;
 
         if (dist > tightRadius || isBackground) {
             data.data[i + 3] = 0;
-        } else if (dist > tightRadius * 0.98) {
-            data.data[i + 3] *= (tightRadius - dist) / (tightRadius * 0.02);
+        } else if (dist > tightRadius * 0.95) {
+            data.data[i + 3] *= (tightRadius - dist) / (tightRadius * 0.05);
         }
     }
     cctx.putImageData(data, 0, 0);
@@ -73,15 +76,16 @@ const shipSources = [
     { src: "assets/ship_phoenix.png", tint: null },
     { src: "assets/ship_vanguard.png", tint: null }
 ];
-const shipOffsets = [Math.PI, Math.PI, Math.PI, Math.PI / 2, 0];
 
 const shipConfig = [
-    { color: "#00f2ff", bulletColor: "#00f2ff", trail: "plasma", baseSpeed: 2, baseFireRate: 250, baseDamage: 1 },
-    { color: "#ff3333", bulletColor: "#ff3333", trail: "plasma", baseSpeed: 2, baseFireRate: 250, baseDamage: 1 },
-    { color: "#33ff33", bulletColor: "#33ff33", trail: "plasma", baseSpeed: 2, baseFireRate: 250, baseDamage: 1 },
-    { color: "#ff6600", bulletColor: "#ffaa00", trail: "fire", baseSpeed: 4, baseFireRate: 180, baseDamage: 1.2 },
-    { color: "#888", bulletColor: "#fff", trail: "mech", baseSpeed: 1.5, baseFireRate: 400, baseDamage: 2.5 }
+    { color: "#00f2ff", bulletColor: "#00f2ff", trail: "plasma", baseSpeed: 2, baseFireRate: 280, baseDamage: 1, name: "ALPHA DEFAULT" },
+    { color: "#ff3333", bulletColor: "#ff3333", trail: "plasma", baseSpeed: 2.1, baseFireRate: 280, baseDamage: 1, name: "ALPHA RED" },
+    { color: "#33ff33", bulletColor: "#33ff33", trail: "plasma", baseSpeed: 2.1, baseFireRate: 280, baseDamage: 1, name: "ALPHA GREEN" },
+    { color: "#ff6600", bulletColor: "#ffaa00", trail: "fire", baseSpeed: 3, baseFireRate: 210, baseDamage: 1.2, name: "PHOENIX RED" },
+    { color: "#888", bulletColor: "#fff", trail: "mech", baseSpeed: 1.5, baseFireRate: 450, baseDamage: 2.5, name: "VANGUARD PRO" }
 ];
+
+const shipOffsets = [Math.PI, Math.PI, Math.PI, Math.PI / 2, 0];
 
 const upgradeCosts = {
     fireRate: [500, 1000, 2000, 4000, 8000],
@@ -138,9 +142,12 @@ let highScore = localStorage.getItem("asteroid_highScore") || 0;
 let currentStage = 1;
 let stageFlash = 0;
 let isPaused = false;
-let gameOver = false;
 let cam = { x: 0, y: 0 };
 let shake = 0;
+let joystick = { active: false, dx: 0, dy: 0, angle: 0, dist: 0, maxDist: 75 };
+let isMobileFiring = false;
+let deathReason = "";
+let adminActionTime = 0;
 let userCredits = parseInt(localStorage.getItem("asteroid_credits")) || 0;
 let userEnergy = parseInt(localStorage.getItem("asteroid_energy"));
 if (isNaN(userEnergy) || userEnergy <= 0) {
@@ -210,17 +217,17 @@ window.claimDailyReward = function () {
     localStorage.setItem("asteroid_credits", userCredits);
     closeModal('daily');
     syncMenuUI();
-    alert(`Günün ödülü alındı: ${reward} 🪙`);
+    if (window.showToast) window.showToast(`Günün ödülü alındı: ${reward} 🪙`, "success");
 };
 
 window.refillEnergy = function () {
     // Simulated Ad
-    alert("Reklam İzleniyor...");
+    if (window.showToast) window.showToast("Reklam İzleniyor...", "success");
     setTimeout(() => {
         userEnergy = MAX_ENERGY;
         localStorage.setItem("asteroid_energy", userEnergy);
         syncMenuUI();
-        alert("Enerji Fullendi! ⚡");
+        if (window.showToast) window.showToast("Enerji Fullendi! ⚡", "success");
     }, 2000);
 };
 
@@ -254,28 +261,10 @@ window.buyCoins = function (amount) {
     userCredits += amount;
     localStorage.setItem("asteroid_credits", userCredits);
     syncMenuUI();
-    alert(amount.toLocaleString() + " Coin Başarıyla Eklendi!");
+    if (window.showToast) window.showToast(amount.toLocaleString() + " Coin Başarıyla Eklendi!", "success");
 };
 
-function spawnBoss(type = 1) {
-    asteroids = []; // Clear asteroids
-    boss = {
-        type: type,
-        name: bossImages[type].name,
-        color: bossImages[type].color,
-        x: 1000,
-        y: 300,
-        r: 120 + (type * 10),
-        hp: 2000 * type,
-        maxHp: 2000 * type,
-        a: 0,
-        vx: 0,
-        vy: 0,
-        attackTimer: 0,
-        targetAngle: 0
-    };
-    stageFlash = 1.0;
-}
+// (Deleted old spawnBoss version - replaced by consolidated one below)
 
 // MISSION TRACKING
 let missionProgress = JSON.parse(localStorage.getItem("asteroid_missions")) || {};
@@ -388,6 +377,7 @@ const bossConfigs = {
 
 function spawnBoss(type = 1) {
     const config = bossConfigs[type];
+    if (!config) return;
     boss = {
         type: type,
         name: config.name,
@@ -402,8 +392,11 @@ function spawnBoss(type = 1) {
         vy: 2,
         attackTimer: 0
     };
-    asteroids = []; // Clear asteroids
+    asteroids = [];
+    bullets = [];
     stageFlash = 1.0;
+    // Give player a brief invulnerability when boss spawns
+    ship.invulnerable = Date.now() + 2000;
 }
 
 // Initial Spawn
@@ -441,7 +434,10 @@ let keys = {};
 // INPUT LISTENERS
 canvas.addEventListener("touchstart", e => {
     e.preventDefault();
-    if (gameOver) { restartGame(); return; }
+    if (gameOver) {
+        if (Date.now() - adminActionTime < 1000) return;
+        restartGame(); return;
+    }
     const t = e.touches[0];
     touch.active = true;
     touch.x = t.clientX;
@@ -452,7 +448,10 @@ canvas.addEventListener("touchmove", e => { e.preventDefault(); const t = e.touc
 canvas.addEventListener("touchend", e => { e.preventDefault(); touch.active = false; }, { passive: false });
 
 canvas.addEventListener("mousedown", e => {
-    if (gameOver) { restartGame(); return; }
+    if (gameOver) {
+        if (Date.now() - adminActionTime < 1000) return;
+        restartGame(); return;
+    }
     mouse.active = true;
     mouse.x = e.clientX;
     mouse.y = e.clientY;
@@ -466,7 +465,10 @@ window.addEventListener("keydown", e => {
         togglePause();
         return;
     }
-    if (gameOver) { restartGame(); return; }
+    if (gameOver) {
+        if (Date.now() - adminActionTime < 1000) return;
+        restartGame(); return;
+    }
     keys[e.key] = true;
     if (e.key === " ") shoot();
 });
@@ -578,7 +580,12 @@ function update() {
         ship.damage = base.baseDamage + (upgrades.damage * 0.5);
 
         // Input Handling
-        if (touch.active || mouse.active) {
+        if (joystick.active) {
+            ship.a = joystick.angle;
+            let speed = (joystick.dist / joystick.maxDist) * ship.maxSpeed;
+            ship.x += Math.cos(ship.a) * speed;
+            ship.y += Math.sin(ship.a) * speed;
+        } else if (touch.active || mouse.active) {
             let ix = touch.active ? touch.x : mouse.x; let iy = touch.active ? touch.y : mouse.y;
             let dx = (ix + cam.x) - ship.x; let dy = (iy + cam.y) - ship.y;
             let dist = Math.sqrt(dx * dx + dy * dy);
@@ -595,6 +602,15 @@ function update() {
                 ship.a = Math.atan2(dy, dx);
             }
         }
+        
+        // Firing Logic
+        if (keys[" "] || isMobileFiring) {
+            if (Date.now() - ship.lastFire > ship.fireDelay) {
+                fireBullet();
+                ship.lastFire = Date.now();
+            }
+        }
+
         let mx = 0, my = 0;
         if (keys["ArrowUp"] || keys["w"]) my -= 1; if (keys["ArrowDown"] || keys["s"]) my += 1;
         if (keys["ArrowLeft"] || keys["a"]) mx -= 1; if (keys["ArrowRight"] || keys["d"]) mx += 1;
@@ -662,8 +678,10 @@ function update() {
             if (hit) continue;
 
             let sdx = a.x - ship.x, sdy = a.y - ship.y;
-            if (Math.sqrt(sdx * sdx + sdy * sdy) < a.r + ship.r - 10) {
-                createExplosion(ship.x, ship.y, "#00f2ff", 40); shake = 30; gameOver = true;
+            const isInvulnerable = ship.invulnerable && Date.now() < ship.invulnerable;
+            if (!isInvulnerable && Math.sqrt(sdx * sdx + sdy * sdy) < a.r + ship.r - 10) {
+                createExplosion(ship.x, ship.y, "#00f2ff", 40); shake = 30; 
+                gameOver = true; deathReason = "ASTEROID COLLISION";
             }
         }
 
@@ -677,8 +695,9 @@ function update() {
             let dist = Math.sqrt(hdx * hdx + hdy * hdy);
 
             // Collision with expanding edge
-            if (h.life > 0.2 && Math.abs(dist - h.r) < 15) {
-                gameOver = true;
+            const isInvulnerable = ship.invulnerable && Date.now() < ship.invulnerable;
+            if (!isInvulnerable && h.life > 0.2 && Math.abs(dist - h.r) < 15) {
+                gameOver = true; deathReason = "HAZARD (STAGE 2)";
             }
 
             if (h.life <= 0) hazards.splice(i, 1);
@@ -738,6 +757,12 @@ function update() {
         ctx.save(); ctx.translate(ship.x, ship.y);
         const offset = (typeof shipOffsets[currentShipIndex] !== 'undefined') ? shipOffsets[currentShipIndex] : Math.PI;
         ctx.rotate(ship.a + offset);
+        
+        // Invulnerability Blink
+        if (ship.invulnerable && Date.now() < ship.invulnerable) {
+            ctx.globalAlpha = 0.5 + Math.sin(Date.now() * 0.02) * 0.3;
+        }
+
         ctx.shadowBlur = 8; ctx.shadowColor = "#00f2ff";
         const currentShip = shipAssets[currentShipIndex] || shipAssets[0];
         if (currentShip) ctx.drawImage(currentShip, -ship.r, -ship.r, ship.r * 2, ship.r * 2);
@@ -860,23 +885,26 @@ function update() {
 
             boss.attackTimer++;
             if (boss.attackTimer > 300) {
-                for (let i = 0; i < 3; i++) {
-                    const offset = (i - 1) * 0.4;
-                    const ang = Math.atan2(dy, dx) + offset;
-                    asteroids.push({
-                        x: boss.x + Math.cos(ang) * boss.r,
-                        y: boss.y + Math.sin(ang) * boss.r,
-                        vx: Math.cos(ang) * 1.2,
-                        vy: Math.sin(ang) * 1.2,
-                        r: 25,
-                        rot: Math.random() * Math.PI * 2,
-                        vrot: Math.random() * 0.1 - 0.05,
-                        level: 1,
-                        type: 1
-                    });
+                if (asteroids.length < 40) { // PERFORMANCE LIMIT
+                    for (let i = 0; i < 3; i++) {
+                        const offset = (i - 1) * 0.4;
+                        const ang = Math.atan2(dy, dx) + offset;
+                        asteroids.push({
+                            x: boss.x + Math.cos(ang) * boss.r,
+                            y: boss.y + Math.sin(ang) * boss.r,
+                            vx: Math.cos(ang) * 1.2,
+                            vy: Math.sin(ang) * 1.2,
+                            r: 25,
+                            rot: Math.random() * Math.PI * 2,
+                            vrot: Math.random() * 0.1 - 0.05,
+                            level: 1,
+                            type: boss.type
+                        });
+                    }
                 }
                 boss.attackTimer = 0;
             }
+
 
             bullets.forEach((b, bIdx) => {
                 const bdx = b.x - boss.x;
@@ -911,7 +939,10 @@ function update() {
                 }
             });
 
-            if (dist < boss.r + ship.r) gameOver = true;
+            const isInvulnerable = ship.invulnerable && Date.now() < ship.invulnerable;
+            if (!isInvulnerable && dist < boss.r + ship.r) {
+                gameOver = true; deathReason = "BOSS COLLISION";
+            }
         }
 
         // Stage 3 Transition (Higher threshold)
@@ -936,6 +967,8 @@ function update() {
         ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
         ctx.fillStyle = "#ff0077"; ctx.font = "900 60px sans-serif"; ctx.textAlign = "center";
         ctx.fillText("OYUN BİTTİ", window.innerWidth / 2, window.innerHeight / 2);
+        ctx.fillStyle = "#fff"; ctx.font = "900 14px sans-serif";
+        ctx.fillText("REASON: " + deathReason, window.innerWidth / 2, window.innerHeight / 2 + 50);
     }
 
     if (stageFlash > 0) {
@@ -983,6 +1016,20 @@ function update() {
     ctx.fillStyle = "rgba(255, 215, 0, 0.6)"; ctx.font = "900 14px sans-serif"; ctx.fillText("BEST: " + parseInt(highScore).toLocaleString(), 40, 120);
     ctx.restore();
     if (scoreFlash > 0) scoreFlash -= 0.05;
+
+    // --- DEBUG HUD (ADMIN ONLY) ---
+    if (window.location.search.includes("admin=true")) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(10, 150, 200, 100);
+        ctx.strokeStyle = "var(--neon-blue)"; ctx.strokeRect(10, 150, 200, 100);
+        ctx.fillStyle = "#fff"; ctx.font = "10px monospace"; ctx.textAlign = "left";
+        ctx.fillText("DEBUG MODE", 20, 170);
+        ctx.fillText("STAGE: " + currentStage, 20, 185);
+        ctx.fillText("SCORE: " + score, 20, 200);
+        ctx.fillText("BOSS: " + (boss ? boss.name : "NONE"), 20, 215);
+        ctx.fillText("GAMEOVER: " + gameOver, 20, 230);
+        ctx.restore();
+    }
 }
 
 function restartGame() {
@@ -997,7 +1044,7 @@ function restartGame() {
 // BUY UPGRADE
 window.buyUpgrade = function (type) {
     const currentLevel = upgrades[type];
-    if (currentLevel >= 5) return; // Max level
+    if (currentLevel >= 5) return;
 
     const cost = upgradeCosts[type][currentLevel];
     if (userCredits >= cost) {
@@ -1006,11 +1053,48 @@ window.buyUpgrade = function (type) {
         localStorage.setItem("asteroid_credits", userCredits);
         localStorage.setItem("asteroid_upgrades", JSON.stringify(upgrades));
         syncMenuUI();
-
-        // Visual feedback (optional)
-        console.log(`Upgrade purchased: ${type} Level ${upgrades[type]}`);
+        if (window.showToast) window.showToast(type.toUpperCase() + " Geliştirildi!", "success");
     } else {
-        alert("Yetersiz Coin!");
+        if (window.showToast) window.showToast("Yetersiz Coin! (Fiyat: " + cost + ")", "error");
+    }
+};
+
+window.buyBullet = function (index, price) {
+    let userBullets = JSON.parse(localStorage.getItem("asteroid_owned_bullets")) || [0];
+    if (userBullets.includes(index)) return true; // Already owned
+
+    if (userCredits >= price) {
+        userCredits -= price;
+        userBullets.push(index);
+        localStorage.setItem("asteroid_credits", userCredits);
+        localStorage.setItem("asteroid_owned_bullets", JSON.stringify(userBullets));
+        syncMenuUI();
+        if (window.showToast) window.showToast("Mermi Satın Alındı!", "success");
+        return true;
+    } else {
+        if (window.showToast) window.showToast("Yetersiz Coin! (Fiyat: " + price + ")", "error");
+        return false;
+    }
+};
+
+window.buyEnergy = function (amount, cost, type) {
+    if (type === 'coin') {
+        if (userCredits >= cost) {
+            userCredits -= cost;
+            userEnergy += amount;
+            localStorage.setItem("asteroid_credits", userCredits);
+            localStorage.setItem("asteroid_energy", userEnergy);
+            syncMenuUI();
+            if (window.showToast) window.showToast(amount + " Enerji Başarıyla Alındı!", "success");
+        } else {
+            if (window.showToast) window.showToast("Yetersiz Coin! (Fiyat: " + cost + ")", "error");
+        }
+    } else if (type === 'iap') {
+        // Simulated IAP Purchase
+        userEnergy += amount;
+        localStorage.setItem("asteroid_energy", userEnergy);
+        syncMenuUI();
+        if (window.showToast) window.showToast("Premium " + amount + " Enerji Hesaba Eklendi!", "success");
     }
 };
 
@@ -1053,7 +1137,6 @@ function syncMenuUI() {
                     <div class="up-info">
                         <div class="up-icon" style="color: ${done ? 'var(--neon-gold)' : '#555'}">🏆</div>
                         <div>
-                            <h4 style="color: ${done ? 'var(--neon-gold)' : '#fff'}">${a.name}</h4>
                             <p>${a.desc}</p>
                         </div>
                     </div>
@@ -1163,8 +1246,7 @@ window.claimMission = function (id) {
         localStorage.setItem("asteroid_missions", JSON.stringify(missionProgress));
         syncMenuUI();
 
-        // Success effect
-        alert(`${m.title} Tamamlandı! ${m.reward.toLocaleString()} Coin Kazanıldı!\n10 Dakika Sonra Yeni Görev Gelecek.`);
+        if (window.showToast) window.showToast(m.title + " Tamamlandı! +" + m.reward + " 🪙", "success");
     }
 };
 syncMenuUI();
@@ -1174,7 +1256,7 @@ update();
 
 window.startGame = function () {
     if (userEnergy < ENERGY_COST) {
-        alert("Yetersiz Enerji! ⚡\nLütfen enerji topla veya reklam izle.");
+        if (window.showToast) window.showToast("Yetersiz Enerji! ⚡", "error");
         openModal('iap');
         return;
     }
@@ -1242,16 +1324,51 @@ window.setGameShip = function (index) {
 requestAnimationFrame(update);
 // ADMIN TOOLS
 function adminPrepareGame() {
+    adminActionTime = Date.now();
     gameStarted = true;
     gameOver = false;
     isPaused = false;
+    deathReason = "";
+    
+    // Clear entities
+    bullets = [];
+    particles = [];
+    hazards = [];
+    floatingTexts = [];
+    asteroids = [];
+    boss = null;
 
-    // Hide ALL menu layers (Mirroring startGame logic)
+    // Reset Ship State
+    ship.x = 1000;
+    ship.y = 700;
+    ship.a = 0;
+    ship.invulnerable = Date.now() + 2000; // 2 seconds of safety
+    
+    // Sync Camera
+    cam.x = ship.x - window.innerWidth / 2;
+    cam.y = ship.y - window.innerHeight / 2;
+
     if (window.closeModal) closeModal('mode');
+    if (window.closeModal) closeModal('mode');
+    
+    // Show Mobile Controls if touch device or small screen
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.matchMedia("(pointer: coarse)").matches;
+    if (isTouch || window.innerWidth < 1100) {
+        const mc = document.getElementById("mobile-controls");
+        if (mc) mc.style.display = "block";
+    }
+
     if (document.getElementById("entry-screen")) document.getElementById("entry-screen").style.display = "none";
     if (document.getElementById("menu-bg")) document.getElementById("menu-bg").style.display = "none";
     if (document.querySelector(".grid-layer")) document.querySelector(".grid-layer").style.display = "none";
     if (document.querySelector(".overlay-effects")) document.querySelector(".overlay-effects").style.display = "none";
+    
+    // Show Mobile Controls if touch device or small screen
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.matchMedia("(pointer: coarse)").matches;
+    if (isTouch || window.innerWidth < 1100) {
+        const mc = document.getElementById("mobile-controls");
+        if (mc) mc.style.display = "block";
+    }
 
     const pauseBtn = document.getElementById("ingame-pause-btn");
     if (pauseBtn) pauseBtn.style.display = "flex";
@@ -1262,13 +1379,13 @@ function adminPrepareGame() {
 window.adminSetStage = function (s) {
     adminPrepareGame();
     currentStage = s;
+    
+    // Score thresholds (Just below the boss spawn to allow a few shots first)
     if (s === 1) score = 0;
-    else if (s === 2) score = 10001; // Just over the threshold
-    else if (s === 3) score = 40001; // Final stage threshold
+    else if (s === 2) score = 10005; // Stage 1 Boss is dead, now in Stage 2
+    else if (s === 3) score = 20005; // Stage 2 Boss is dead, now in Stage 3
 
     displayScore = score;
-    boss = null;
-    asteroids = [];
     initAsteroids();
     stageFlash = 1.0;
     console.log("Admin: Set Stage to", s);
@@ -1276,9 +1393,82 @@ window.adminSetStage = function (s) {
 
 window.adminSpawnBoss = function (type) {
     adminPrepareGame();
+    // Ensure score is correct for the stage
+    if (type === 1) { currentStage = 1; score = 10000; }
+    if (type === 2) { currentStage = 2; score = 20000; }
+    if (type === 3) { currentStage = 3; score = 40000; }
+    
+    displayScore = score;
     spawnBoss(type);
     console.log("Admin: Spawned Boss", type);
 };
+
+// MOBILE INPUT LISTENERS
+function initMobileInputs() {
+    const joyArea = document.getElementById("joystick-area");
+    const joyKnob = document.getElementById("joystick-knob");
+    const fireBtn = document.getElementById("fire-btn");
+
+    if (!joyArea || !fireBtn) return;
+
+    joyArea.addEventListener("pointerdown", (e) => {
+        joystick.active = true;
+        updateJoystick(e);
+    });
+
+    window.addEventListener("pointermove", (e) => {
+        if (joystick.active) updateJoystick(e);
+    });
+
+    window.addEventListener("pointerup", () => {
+        joystick.active = false;
+        joystick.dist = 0;
+        if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
+    });
+
+    function updateJoystick(e) {
+        const rect = joyArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        let dx = e.clientX - centerX;
+        let dy = e.clientY - centerY;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > joystick.maxDist) {
+            dx = (dx / dist) * joystick.maxDist;
+            dy = (dy / dist) * joystick.maxDist;
+            dist = joystick.maxDist;
+        }
+
+        joystick.dx = dx;
+        joystick.dy = dy;
+        joystick.dist = dist;
+        joystick.angle = Math.atan2(dy, dx);
+
+        if (joyKnob) joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
+
+    fireBtn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        isMobileFiring = true;
+    });
+
+    window.addEventListener("pointerup", (e) => {
+        isMobileFiring = false;
+    });
+}
+
+// Ensure mobile controls are hidden on return to menu
+const originalReturnToMenu = window.returnToMenu;
+window.returnToMenu = function() {
+    if (originalReturnToMenu) originalReturnToMenu();
+    const mc = document.getElementById("mobile-controls");
+    if (mc) mc.style.display = "none";
+    joystick.active = false;
+    isMobileFiring = false;
+};
+
+document.addEventListener("DOMContentLoaded", initMobileInputs);
 
 // Check for Admin Query (Wait for DOM)
 document.addEventListener("DOMContentLoaded", () => {

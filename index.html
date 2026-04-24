@@ -250,6 +250,104 @@
             position: relative;
         }
 
+        /* TOAST NOTIFICATION */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            background: rgba(10, 10, 20, 0.9);
+            border: 1px solid var(--neon-blue);
+            box-shadow: 0 0 15px var(--neon-blue);
+            color: #fff;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-family: sans-serif;
+            font-weight: 900;
+            font-size: 14px;
+            letter-spacing: 1px;
+            animation: toastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), toastOut 0.4s 2.6s forwards;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toast.error {
+            border-color: #ff0077;
+            box-shadow: 0 0 15px #ff0077;
+        }
+        @keyframes toastIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes toastOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-20px); opacity: 0; } }
+
+        /* MOBILE CONTROLS */
+        #mobile-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40%;
+            pointer-events: none;
+            display: none; /* Controlled by JS */
+            z-index: 99999;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        .joystick-container {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 242, 255, 0.3);
+            border-radius: 50%;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+        #joystick-knob {
+            width: 60px;
+            height: 60px;
+            background: var(--neon-blue);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--neon-blue);
+            position: absolute;
+            transition: transform 0.05s ease-out;
+        }
+        #fire-btn {
+            position: absolute;
+            bottom: 60px;
+            right: 60px;
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 0, 119, 0.2);
+            border: 3px solid var(--neon-pink);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--neon-pink);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 900;
+            pointer-events: auto;
+            touch-action: none;
+            transition: transform 0.1s, background 0.1s;
+        }
+        #fire-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 0, 119, 0.6);
+        }
+
         #start-btn {
             width: 90vw;
             max-width: 500px;
@@ -1119,6 +1217,8 @@
     <div class="overlay-effects"></div>
 
     <!-- MAIN MENU -->
+    <div id="toast-container"></div>
+
     <div id="entry-screen">
         <div class="top-hud">
             <div class="profile-card">
@@ -1189,6 +1289,14 @@
 
     <!-- IN-GAME HUD -->
     <button id="ingame-pause-btn" onclick="togglePause()">II</button>
+
+    <!-- MOBILE CONTROLS -->
+    <div id="mobile-controls">
+        <div class="joystick-container" id="joystick-area">
+            <div id="joystick-knob"></div>
+        </div>
+        <div id="fire-btn">FIRE</div>
+    </div>
 
     <!-- MODE SELECTION -->
     <div id="mode-modal" class="modal">
@@ -1613,6 +1721,7 @@
                     <div class="sidebar-header">BİRİMLER</div>
                     <button class="cat-btn active" onclick="filterIAP('coins', this)">COIN PAKETLERİ</button>
                     <button class="cat-btn" onclick="filterIAP('packs', this)">ÖZEL TEKLİFLER</button>
+                    <button class="cat-btn" onclick="filterIAP('energy', this)">ENERJİ</button>
                     <button class="cat-btn" onclick="filterIAP('events', this)">EVENTS</button>
                 </div>
 
@@ -1650,6 +1759,58 @@
                                 <h3 style="color: #ffaa00">KRALİYET HAZİNESİ</h3>
                                 <p class="ship-desc">Sınırsız güç. 250,000 Coin içerir.</p>
                                 <button class="buy-btn" onclick="buyCoins(250000)">$19.99</button>
+                            </div>
+                        </div>
+
+                        <!-- ENERGY PACKS (COIN) -->
+                        <div class="ship-card iap-card" data-category="energy" style="display: none;">
+                            <div class="bullet-preview-box"><div style="font-size: 50px;">⚡</div></div>
+                            <div class="ship-details">
+                                <h3 style="color: #00f2ff">ENERJİ PAKETİ S</h3>
+                                <p class="ship-desc">50 Enerji yeniler.</p>
+                                <button class="buy-btn" onclick="buyEnergy(50, 1000, 'coin')">1,000 🪙</button>
+                            </div>
+                        </div>
+                        <div class="ship-card iap-card" data-category="energy" style="display: none;">
+                            <div class="bullet-preview-box"><div style="font-size: 60px;">⚡⚡</div></div>
+                            <div class="ship-details">
+                                <h3 style="color: #00f2ff">ENERJİ PAKETİ M</h3>
+                                <p class="ship-desc">100 Enerji yeniler.</p>
+                                <button class="buy-btn" onclick="buyEnergy(100, 1800, 'coin')">1,800 🪙</button>
+                            </div>
+                        </div>
+                        <div class="ship-card iap-card" data-category="energy" style="display: none;">
+                            <div class="bullet-preview-box"><div style="font-size: 70px;">⚡⚡⚡</div></div>
+                            <div class="ship-details">
+                                <h3 style="color: #00f2ff">ENERJİ PAKETİ L</h3>
+                                <p class="ship-desc">200 Enerji yeniler.</p>
+                                <button class="buy-btn" onclick="buyEnergy(200, 3200, 'coin')">3,200 🪙</button>
+                            </div>
+                        </div>
+
+                        <!-- ENERGY PACKS (IAP) -->
+                        <div class="ship-card iap-card" data-category="energy" style="display: none;">
+                            <div class="bullet-preview-box"><div style="font-size: 50px; filter: drop-shadow(0 0 10px #ff0077);">🔋</div></div>
+                            <div class="ship-details">
+                                <h3 style="color: #ff0077">PREMIUM ENERJİ S</h3>
+                                <p class="ship-desc">300 Enerji yeniler.</p>
+                                <button class="buy-btn" onclick="buyEnergy(300, 4.99, 'iap')">$4.99</button>
+                            </div>
+                        </div>
+                        <div class="ship-card iap-card" data-category="energy" style="display: none;">
+                            <div class="bullet-preview-box"><div style="font-size: 60px; filter: drop-shadow(0 0 10px #ff0077);">🔋🔋</div></div>
+                            <div class="ship-details">
+                                <h3 style="color: #ff0077">PREMIUM ENERJİ M</h3>
+                                <p class="ship-desc">500 Enerji yeniler.</p>
+                                <button class="buy-btn" onclick="buyEnergy(500, 7.99, 'iap')">$7.99</button>
+                            </div>
+                        </div>
+                        <div class="ship-card iap-card" data-category="energy" style="display: none;">
+                            <div class="bullet-preview-box"><div style="font-size: 70px; filter: drop-shadow(0 0 10px #ff0077);">🔋🔋🔋</div></div>
+                            <div class="ship-details">
+                                <h3 style="color: #ff0077">PREMIUM ENERJİ L</h3>
+                                <p class="ship-desc">1000 Enerji yeniler.</p>
+                                <button class="buy-btn" onclick="buyEnergy(1000, 14.99, 'iap')">$14.99</button>
                             </div>
                         </div>
                     </div>
@@ -1743,6 +1904,19 @@
             return c;
         }
 
+        window.showToast = function(msg, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icon = type === 'success' ? '🚀' : '⚠️';
+            toast.innerHTML = `<span>${icon}</span> ${msg}`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                if (toast.parentNode) toast.remove();
+            }, 3000);
+        }
+
         function initShipPreviews() {
             const canvases = document.querySelectorAll('.ship-preview-canvas');
             canvases.forEach(canvas => {
@@ -1764,31 +1938,87 @@
         }
         window.addEventListener('load', initShipPreviews);
 
+        let ownedShips = JSON.parse(localStorage.getItem("asteroid_owned_ships")) || [0];
+        let currentSelectedShip = parseInt(localStorage.getItem("asteroid_selected_ship")) || 0;
+
         function selectShip(index, price) {
-            // Simple logic for testing
-            const btns = document.querySelectorAll('.buy-btn');
+            const carousel = document.getElementById('market-carousel');
+            if (!carousel) return;
+            const btns = carousel.querySelectorAll('.buy-btn');
+            
+            // Sync current owned list from storage
+            ownedShips = JSON.parse(localStorage.getItem("asteroid_owned_ships")) || [0];
+
+            // 1. Check if Owned
+            if (!ownedShips.includes(index)) {
+                // Try to Buy
+                let userCredits = parseInt(localStorage.getItem("asteroid_credits")) || 0;
+                if (userCredits >= price) {
+                    userCredits -= price;
+                    localStorage.setItem("asteroid_credits", userCredits);
+                    ownedShips.push(index);
+                    localStorage.setItem("asteroid_owned_ships", JSON.stringify(ownedShips));
+                    if (window.syncMenuUI) window.syncMenuUI();
+                    console.log("Ship Purchased:", index);
+                    showToast("Gemi Başarıyla Satın Alındı!", "success");
+                } else {
+                    showToast("Yeterli Coin Yok! (Fiyat: " + price + ")", "error");
+                    return;
+                }
+            }
+
+            // 2. Select the Ship
+            currentSelectedShip = index;
+            localStorage.setItem("asteroid_selected_ship", index);
+            if (window.setGameShip) window.setGameShip(index);
+
+            // 3. Update UI
             btns.forEach((btn, i) => {
-                if (i === index) {
+                const btnIndex = parseInt(btn.getAttribute('onclick').match(/\d+/)[0]);
+                if (btnIndex === currentSelectedShip) {
                     btn.innerText = 'SEÇİLDİ';
                     btn.classList.add('select-active');
-                } else {
+                    btn.style.background = "var(--neon-blue)";
+                    btn.style.color = "#000";
+                } else if (ownedShips.includes(btnIndex)) {
                     btn.innerText = 'SEÇ';
                     btn.classList.remove('select-active');
+                    btn.style.background = "transparent";
+                    btn.style.color = "var(--neon-blue)";
                 }
             });
 
-            if (window.setGameShip) {
-                window.setGameShip(index);
+            // Flash effect
+            const cards = carousel.querySelectorAll('.ship-card');
+            if (cards[index]) {
+                cards[index].animate([
+                    { boxShadow: '0 0 0px var(--neon-blue)' },
+                    { boxShadow: '0 0 50px var(--neon-blue)' },
+                    { boxShadow: '0 0 0px var(--neon-blue)' }
+                ], { duration: 500 });
             }
-
-            // Flash effect on selection
-            const cards = document.querySelectorAll('.ship-card');
-            cards[index].animate([
-                { boxShadow: '0 0 0px var(--neon-blue)' },
-                { boxShadow: '0 0 50px var(--neon-blue)' },
-                { boxShadow: '0 0 0px var(--neon-blue)' }
-            ], { duration: 500 });
         }
+        
+        // Initial Sync on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const carousel = document.getElementById('market-carousel');
+                if (carousel) {
+                    const btns = carousel.querySelectorAll('.buy-btn');
+                    btns.forEach((btn, i) => {
+                        if (i === currentSelectedShip) {
+                            btn.innerText = 'SEÇİLDİ';
+                            btn.classList.add('select-active');
+                            btn.style.background = "var(--neon-blue)";
+                            btn.style.color = "#000";
+                        } else if (ownedShips.includes(i)) {
+                            btn.innerText = 'SEÇ';
+                        }
+                    });
+                }
+                if (window.setGameShip) window.setGameShip(currentSelectedShip);
+            }, 600); 
+        });
         function selectBullet(index, price, btn) {
             if (window.buyBullet) {
                 const success = window.buyBullet(index, price);
@@ -1838,17 +2068,17 @@ backdrop-filter: blur(10px);
 
         <p style="color:#888;font-size:10px;font-weight:900;margin-bottom:8px;">STAGE</p>
         <div style="display:flex;gap:8px;margin-bottom:15px;">
-            <button onclick="adminSetStage(1)">1</button>
-            <button onclick="adminSetStage(2)">2</button>
-            <button onclick="adminSetStage(3)">3</button>
+            <button onclick="adminSetStage(1); this.blur();">1</button>
+            <button onclick="adminSetStage(2); this.blur();">2</button>
+            <button onclick="adminSetStage(3); this.blur();">3</button>
         </div>
 
         <p style="color:#888;font-size:10px;font-weight:900;margin-bottom:8px;">BOSS</p>
         <div style="display:flex;gap:8px;margin-bottom:15px;">
-            <button onclick="adminSpawnBoss(1)">B1</button>
-            <button onclick="adminSpawnBoss(2)">B2</button>
-            <button onclick="adminSpawnBoss(3)">B3</button>
+            <button onclick="adminSpawnBoss(1); this.blur();">B1</button>
+            <button onclick="adminSpawnBoss(2); this.blur();">B2</button>
+            <button onclick="adminSpawnBoss(3); this.blur();">B3</button>
         </div>
 
-        <button onclick="location.reload()">RELOAD</button>
+        <button onclick="location.reload(); this.blur();">RELOAD</button>
     </div>
