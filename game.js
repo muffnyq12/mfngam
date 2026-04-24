@@ -128,7 +128,7 @@ astImg.onerror = ast2Img.onerror = ast3Img.onerror = bgImg.onerror = (e) => {
 // GAME STATE
 let gameStarted = false;
 let world = { width: 2000, height: 1400 };
-let ship = { x: 1000, y: 700, a: 0, r: 25 };
+let ship = { x: 1000, y: 700, a: 0, r: 25, lastFire: 0, invulnerable: 0 };
 let bullets = [];
 let asteroids = [];
 let particles = [];
@@ -603,7 +603,7 @@ function update() {
         
         // Firing Logic
         if (keys[" "] || isMobileFiring) {
-            if (Date.now() - ship.lastFire > ship.fireDelay) {
+            if (Date.now() - (ship.lastFire || 0) > ship.fireDelay) {
                 shoot();
                 ship.lastFire = Date.now();
             }
