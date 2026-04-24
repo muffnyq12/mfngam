@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Asteroids Pro - Ultra Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Space+Grotesk:wght@300;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-pink: #ff0077;
+            --neon-purple: #bc13fe;
+            --neon-gold: #ffd700;
+            --glass: rgba(10, 10, 20, 0.8);
+            --border: rgba(0, 242, 255, 0.2);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            background: #000; 
+            color: white; 
+            font-family: 'Outfit', sans-serif; 
+            overflow: hidden; 
+            width: 100vw; height: 100vh;
+        }
+        
+        /* CINEMATIC LAYERS */
+        #menu-bg {
+            position: absolute; inset: 0;
+            background: url('assets/menu_bg.png') no-repeat center center;
+            background-size: cover; z-index: -2;
+            filter: brightness(0.5) contrast(1.2); animation: bgMove 40s infinite linear;
+        }
+        @keyframes bgMove { from { transform: scale(1) rotate(0deg); } to { transform: scale(1.2) rotate(2deg); } }
+
+        .overlay-effects {
+            position: absolute; inset: 0; z-index: -1;
+            background: 
+                radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.8) 100%),
+                repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 2px);
+            pointer-events: none;
+        }
+
+        /* GRID ANIMATION */
+        .grid-layer {
+            position: absolute; bottom: -50%; left: -50%; width: 200%; height: 200%;
+            background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 60px 60px;
+            transform: perspective(500px) rotateX(60deg);
+            z-index: -1; animation: gridMove 10s infinite linear;
+            opacity: 0.3;
+        }
+        @keyframes gridMove { from { background-position: 0 0; } to { background-position: 0 60px; } }
+
+        /* UI CONTAINERS */
+        #entry-screen {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+            padding: 5vh 5vw; z-index: 100; transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .top-hud {
+            width: 100%; display: flex; justify-content: space-between; align-items: flex-start;
+        }
+        .profile-card {
+            background: var(--glass); padding: 15px 25px; border-radius: 15px 0 15px 0;
+            border-left: 4px solid var(--neon-blue); backdrop-filter: blur(20px);
+            display: flex; gap: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .best-score-badge {
+            background: var(--glass); padding: 15px 25px; border-radius: 0 15px 0 15px;
+            border-right: 4px solid var(--neon-gold); backdrop-filter: blur(20px);
+            text-align: right;
+        }
+
+        /* LOGO */
+        .main-logo { text-align: center; margin-top: -5vh; }
+        .main-logo p { font-family: 'Space Grotesk', sans-serif; letter-spacing: 12px; color: var(--neon-blue); font-weight: 300; margin-bottom: -15px; text-shadow: 0 0 20px var(--neon-blue); }
+        .main-logo h1 { 
+            font-size: clamp(80px, 20vw, 120px); font-weight: 900; letter-spacing: -5px; line-height: 1;
+            background: linear-gradient(to bottom, #fff 20%, #444 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 30px rgba(0, 242, 255, 0.4));
+        }
+
+        /* START SECTION */
+        .start-container { position: relative; }
+        #start-btn {
+            width: 220px; height: 220px;
+            background: url('assets/start_btn.png') no-repeat center center;
+            background-size: contain; border: none; cursor: pointer;
+            filter: drop-shadow(0 0 30px var(--neon-blue));
+            animation: startFloat 4s infinite ease-in-out;
+            transition: 0.3s;
+        }
+        #start-btn:active { transform: scale(0.85); filter: brightness(1.5) drop-shadow(0 0 50px var(--neon-blue)); }
+        @keyframes startFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-15px) scale(1.05); }
+        }
+        .scan-line {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 300px; height: 2px; background: var(--neon-blue);
+            box-shadow: 0 0 20px var(--neon-blue); opacity: 0;
+            animation: scanMove 4s infinite; pointer-events: none;
+        }
+        @keyframes scanMove { 0% { top: 20%; opacity: 0; } 50% { opacity: 0.5; } 100% { top: 80%; opacity: 0; } }
+
+        /* FOOTER NAV */
+        .bottom-actions {
+            width: 100%; max-width: 600px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+        }
+        .action-card {
+            background: var(--glass); padding: 25px; border-radius: 20px;
+            border: 1px solid var(--border); text-align: center;
+            backdrop-filter: blur(15px); transition: 0.3s; position: relative;
+            overflow: hidden;
+        }
+        .action-card::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: 0.5s;
+        }
+        .action-card:active::before { left: 100%; }
+        .action-card h3 { font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #fff; margin-bottom: 5px; }
+        .action-card p { font-size: 12px; font-weight: 700; color: var(--neon-blue); }
+
+        /* MODALS */
+        .modal {
+            position: fixed; inset: 0; background: rgba(2, 2, 5, 0.98);
+            display: none; flex-direction: column; padding: 60px 30px;
+            z-index: 200; backdrop-filter: blur(40px);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .modal-header h2 { font-size: 32px; font-weight: 900; letter-spacing: 2px; border-left: 5px solid var(--neon-blue); padding-left: 15px; }
+        .close-btn { width: 50px; height: 50px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; cursor: pointer; border: 1px solid var(--border); }
+        
+        .item-row {
+            background: rgba(255,255,255,0.03); padding: 25px; border-radius: 20px;
+            margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .item-info h4 { font-size: 20px; font-weight: 700; color: #fff; }
+        .item-info p { font-size: 14px; color: #777; }
+        .item-badge { background: rgba(0, 242, 255, 0.1); color: var(--neon-blue); padding: 5px 12px; border-radius: 8px; font-weight: 900; font-size: 12px; }
+
+        .hidden { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; transform: scale(1.1) !important; }
+        canvas { z-index: 5; }
+    </style>
+</head>
+<body>
+    <div id="menu-bg"></div>
+    <div class="grid-layer"></div>
+    <div class="overlay-effects"></div>
+
+    <!-- MAIN MENU -->
+    <div id="entry-screen">
+        <div class="top-hud">
+            <div class="profile-card">
+                <div class="stat">🪙 <span id="user-credits">2,450</span></div>
+                <div class="stat">⚡ <span id="user-energy">100%</span></div>
+            </div>
+            <div class="best-score-badge">
+                <p style="font-size: 12px; color: var(--neon-gold); font-weight: 900">BEST RECORD</p>
+                <h2 id="menu-highscore" style="font-size: 28px; font-weight: 900">0</h2>
+            </div>
+        </div>
+
+        <div class="main-logo">
+            <p>ADVANCED ARCADE</p>
+            <h1>ASTEROIDS PRO</h1>
+        </div>
+
+        <div class="start-container">
+            <button id="start-btn"></button>
+            <div class="scan-line"></div>
+            <p style="text-align: center; margin-top: 15px; font-weight: 900; color: rgba(255,255,255,0.3); letter-spacing: 3px; font-size: 12px;">DOKUN VE BAŞLAT</p>
+        </div>
+
+        <div class="bottom-actions">
+            <div class="action-card" onclick="openModal('missions')">
+                <h3>GÖREVLER</h3>
+                <p>3 YENİ ÖDÜL</p>
+            </div>
+            <div class="action-card" onclick="openModal('market')">
+                <h3>MARKET</h3>
+                <p>GEMİ GÜNCELLE</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MISSIONS -->
+    <div id="missions-modal" class="modal">
+        <div class="modal-header">
+            <h2>GÖREVLER</h2>
+            <div class="close-btn" onclick="closeModal('missions')">×</div>
+        </div>
+        <div class="item-row">
+            <div class="item-info"><h4>Uzay Kurdu</h4><p>100 Asteroid Yok Et</p></div>
+            <div class="item-badge">42/100</div>
+        </div>
+        <div class="item-row">
+            <div class="item-info"><h4>Stage Ustası</h4><p>Stage 2'ye Hasarsız Geç</p></div>
+            <div class="item-badge" style="color: var(--neon-pink)">AKTİF</div>
+        </div>
+    </div>
+
+    <!-- MARKET -->
+    <div id="market-modal" class="modal">
+        <div class="modal-header">
+            <h2>MARKET</h2>
+            <div class="close-btn" onclick="closeModal('market')">×</div>
+        </div>
+        <div class="item-row">
+            <div class="item-info"><h4>Hyperion-X</h4><p>Hız +%15 | Atış Hızı +%10</p></div>
+            <button style="padding: 12px 25px; background: var(--neon-blue); border: none; border-radius: 12px; font-weight: 900; color: #000">12,000 🪙</button>
+        </div>
+        <div class="item-row">
+            <div class="item-info"><h4>Vanguard Pro</h4><p>Ekstra Kalkan | Geniş Atış</p></div>
+            <button style="padding: 12px 25px; background: var(--neon-pink); border: none; border-radius: 12px; font-weight: 900; color: #fff">25,000 🪙</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="game.js"></script>
+    <script>
+        function openModal(id) { 
+            const m = document.getElementById(id + '-modal');
+            m.style.display = 'flex';
+            m.animate([{opacity: 0, scale: 0.9, filter: 'blur(10px)'}, {opacity: 1, scale: 1, filter: 'blur(0)'}], {duration: 400, easing: 'cubic-bezier(0.4, 0, 0.2, 1)'});
+        }
+        function closeModal(id) { 
+            const m = document.getElementById(id + '-modal');
+            m.animate([{opacity: 1, scale: 1}, {opacity: 0, scale: 1.1, filter: 'blur(10px)'}], {duration: 300, easing: 'ease-in'}).onfinish = () => m.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
