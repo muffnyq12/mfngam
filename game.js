@@ -128,7 +128,7 @@ astImg.onerror = ast2Img.onerror = ast3Img.onerror = bgImg.onerror = (e) => {
 // GAME STATE
 let gameStarted = false;
 let world = { width: 2000, height: 1400 };
-let ship = { x: 1000, y: 700, a: 0, r: 25, lastFire: 0, invulnerable: 0 };
+let ship = { x: 1000, y: 700, a: 0, r: 25, lastFire: 0, invulnerable: 0, isFiring: false };
 let bullets = [];
 let asteroids = [];
 let particles = [];
@@ -602,7 +602,7 @@ function update() {
         }
         
         // Firing Logic
-        if (keys[" "] || isMobileFiring) {
+        if (keys[" "] || ship.isFiring) {
             if (Date.now() - (ship.lastFire || 0) > ship.fireDelay) {
                 shoot();
                 ship.lastFire = Date.now();
@@ -1425,10 +1425,6 @@ function initMobileInputs() {
             joystick.dist = 0;
             if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
         }
-        if (e.pointerId === firePointerId) {
-            isMobileFiring = false;
-            firePointerId = null;
-        }
     });
 
     window.addEventListener("pointercancel", (e) => {
@@ -1436,10 +1432,6 @@ function initMobileInputs() {
             joystick.active = false;
             joystickPointerId = null;
             if (joyKnob) joyKnob.style.transform = `translate(0, 0)`;
-        }
-        if (e.pointerId === firePointerId) {
-            isMobileFiring = false;
-            firePointerId = null;
         }
     });
 
@@ -1462,32 +1454,31 @@ function initMobileInputs() {
         joystick.dist = dist;
         joystick.angle = Math.atan2(dy, dx);
 
-        if (joyKnob) joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        if (joyKnob) {
+            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
     }
 
     const startFire = (e) => {
-        e.preventDefault();
-        firePointerId = e.pointerId || 999;
-        isMobileFiring = true;
+        if (e) e.preventDefault();
+        ship.isFiring = true;
         fireBtn.classList.add("active");
+        shoot(); // Force first shot instantly
     };
 
-    fireBtn.addEventListener("pointerdown", startFire);
-    fireBtn.addEventListener("touchstart", (e) => {
-        if (!isMobileFiring) startFire(e);
-    });
-    fireBtn.addEventListener("touchend", (e) => {
-        isMobileFiring = false;
-        fireBtn.classList.remove("active");
-    });
-
     const stopFire = (e) => {
-        if (e.pointerId === firePointerId) {
-            isMobileFiring = false;
+        if (e && (e.pointerId === firePointerId || e.type === "touchend")) {
+            ship.isFiring = false;
             firePointerId = null;
             fireBtn.classList.remove("active");
         }
     };
+
+    fireBtn.addEventListener("pointerdown", startFire);
+    fireBtn.addEventListener("touchstart", startFire);
+    fireBtn.addEventListener("pointerup", stopFire);
+    fireBtn.addEventListener("touchend", stopFire);
+    fireBtn.addEventListener("pointercancel", stopFire);
 
     window.addEventListener("pointerup", (e) => {
         if (e.pointerId === joystickPointerId) {
