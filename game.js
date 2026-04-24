@@ -1363,13 +1363,6 @@ function adminPrepareGame() {
     if (document.querySelector(".grid-layer")) document.querySelector(".grid-layer").style.display = "none";
     if (document.querySelector(".overlay-effects")) document.querySelector(".overlay-effects").style.display = "none";
     
-    // Show Mobile Controls if touch device or small screen
-    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.matchMedia("(pointer: coarse)").matches;
-    if (isTouch || window.innerWidth < 1100) {
-        const mc = document.getElementById("mobile-controls");
-        if (mc) mc.style.display = "block";
-    }
-
     const pauseBtn = document.getElementById("ingame-pause-btn");
     if (pauseBtn) pauseBtn.style.display = "flex";
 
